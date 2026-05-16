@@ -11,13 +11,13 @@ MariaDB + Python Flask 기반 ATM 운영 현황 모니터링 시스템
 
 ## 프로젝트 구조
 atm_monitoring_system/
-├── app.py                  # Flask 앱 시작점
-├── db_example.py           # DB 연결 템플릿 (db.py로 복사해서 사용)
-├── dao/                    # SQL 쿼리 함수
-├── services/               # 비즈니스 로직
-├── routes/                 # URL 라우팅
-├── templates/              # HTML
-└── static/                 # CSS, JS
+app.py                  # Flask 앱 시작점
+db_example.py           # DB 연결 템플릿 (db.py로 복사해서 사용)
+dao/                    # SQL 쿼리 함수
+services/               # 비즈니스 로직
+routes/                 # URL 라우팅
+templates/              # HTML
+static/                 # CSS, JS
 
 ## 시작 방법
 1. 패키지 설치
