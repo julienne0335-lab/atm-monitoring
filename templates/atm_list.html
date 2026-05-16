@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}ATM 목록 - ATM 모니터링{% endblock %}
+
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="fw-bold mb-0">
+        <i class="bi bi-hdd-stack me-2 text-warning"></i>ATM 목록
+    </h4>
+</div>
+
+<!-- 상태 필터 버튼 -->
+<div class="mb-3">
+    {# 현재 선택된 필터는 실선 버튼, 나머지는 아웃라인 버튼 #}
+    <a href="{{ url_for('atm.atm_list') }}"
+       class="btn btn-sm me-1 {{ 'btn-warning' if not status_filter else 'btn-outline-secondary' }}">
+        전체
+    </a>
+    {% for s, color in [('정상','success'), ('점검중','warning'), ('장애','danger')] %}
+    <a href="{{ url_for('atm.atm_list', status=s) }}"
+       class="btn btn-sm me-1
+              {{ 'btn-'+color if status_filter==s else 'btn-outline-'+color }}
+              {{ 'text-dark' if s=='점검중' and status_filter==s else '' }}">
+        {{ s }}
+    </a>
+    {% endfor %}
+</div>
+
+<!-- ATM 테이블 -->
+<div class="card border-secondary">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover table-sm mb-0">
+                <thead>
+                    <tr>
+                        <th>ATM</th>
+                        <th>은행</th>
+                        <th>지점</th>
+                        <th>상태</th>
+                        <th class="text-end">현금잔량</th>
+                        <th class="text-end">경고임계값</th>
+                        <th class="text-center">경고</th>
+                        <th>최종갱신</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for a in atm_list %}
+                    <tr>
+                        <td class="fw-bold">ATM-{{ a['ATM_id'] }}</td>
+                        <td>
+                            <span class="badge bg-secondary">{{ a['은행명'] }}</span>
+                        </td>
+                        <td>{{ a['지점명'] }}</td>
+                        <td>
+                            <span class="badge
+                                {% if a['상태'] == '정상' %}bg-success
+                                {% elif a['상태'] == '점검중' %}bg-warning text-dark
+                                {% else %}bg-danger{% endif %}">
+                                {{ a['상태'] }}
+                            </span>
+                        </td>
+                        {# 현금잔량이 임계값 이하면 빨간 텍스트 #}
+                        <td class="text-end {{ 'text-danger fw-bold' if a['경고여부'] else '' }}">
+                            {{ "{:,}".format(a['현금잔량']) }}원
+                        </td>
+                        <td class="text-end text-muted">
+                            {{ "{:,}".format(a['경고임계값']) }}원
+                        </td>
+                        <td class="text-center">
+                            {% if a['경고여부'] %}
+                                <i class="bi bi-exclamation-triangle-fill text-warning"></i>
+                            {% else %}
+                                <i class="bi bi-check-circle text-success"></i>
+                            {% endif %}
+                        </td>
+                        <td class="text-muted small">
+                            {# strftime으로 날짜 포맷. None이면 '-' 표시 #}
+                            {{ a['최종갱신일시'].strftime('%m/%d %H:%M') if a['최종갱신일시'] else '-' }}
+                        </td>
+                        <td>
+                            <a href="{{ url_for('atm.atm_detail', atm_id=a['ATM_id']) }}"
+                               class="btn btn-sm btn-outline-primary py-0">
+                                상세
+                            </a>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="9" class="text-center text-muted py-4">
+                            해당하는 ATM이 없습니다.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<p class="text-muted small mt-2">총 {{ atm_list|length }}대</p>
+
+{% endblock %}

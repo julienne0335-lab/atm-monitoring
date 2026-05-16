@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+{% block title %}대시보드 - ATM 모니터링{% endblock %}
+
+{% block content %}
+
+<!-- 페이지 타이틀 -->
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="fw-bold mb-0">
+        <i class="bi bi-speedometer2 me-2 text-warning"></i>운영 현황 대시보드
+    </h4>
+    <small class="text-muted">
+        {% if is_super %}전체 ATM 기준{% else %}담당 지점 기준{% endif %}
+    </small>
+</div>
+
+{# DB 오류 시 개발용 메시지 #}
+{% if db_error %}
+<div class="alert alert-danger">
+    <strong>DB 오류:</strong> {{ db_error }}<br>
+    <small>db.py 설정을 확인해주세요.</small>
+</div>
+{% endif %}
+
+<!-- ── 상단 요약 카드 4개 ── -->
+<div class="row g-3 mb-4">
+
+    <!-- 정상 ATM -->
+    <div class="col-6 col-md-3">
+        <div class="card border-success h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <p class="text-muted small mb-1">정상 ATM</p>
+                        <h2 class="fw-bold text-success mb-0">
+                            {{ atm_status['정상'] }}대
+                        </h2>
+                    </div>
+                    <i class="bi bi-check-circle-fill text-success fs-2 opacity-50"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 점검중 ATM -->
+    <div class="col-6 col-md-3">
+        <div class="card border-warning h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <p class="text-muted small mb-1">점검중 ATM</p>
+                        <h2 class="fw-bold text-warning mb-0">
+                            {{ atm_status['점검중'] }}대
+                        </h2>
+                    </div>
+                    <i class="bi bi-tools text-warning fs-2 opacity-50"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 장애 ATM -->
+    <div class="col-6 col-md-3">
+        <div class="card border-danger h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <p class="text-muted small mb-1">장애 ATM</p>
+                        <h2 class="fw-bold text-danger mb-0">
+                            {{ atm_status['장애'] }}대
+                        </h2>
+                    </div>
+                    <i class="bi bi-exclamation-triangle-fill text-danger fs-2 opacity-50"></i>
+                </div>
+                {% if error_count > 0 %}
+                    <small class="text-danger">미처리 장애 {{ error_count }}건</small>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- 오늘 거래 -->
+    <div class="col-6 col-md-3">
+        <div class="card border-info h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <p class="text-muted small mb-1">오늘 거래</p>
+                        <h2 class="fw-bold text-info mb-0">
+                            {{ today_stats['총거래건수'] if today_stats else 0 }}건
+                        </h2>
+                    </div>
+                    <i class="bi bi-arrow-left-right text-info fs-2 opacity-50"></i>
+                </div>
+                {% if today_stats and today_stats['총수수료'] %}
+                    <small class="text-muted">
+                        수수료 수익 {{ "{:,}".format(today_stats['총수수료']) }}원
+                    </small>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- ── 현금 경고 ATM 목록 ── -->
+<div class="card border-secondary">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h6 class="mb-0 text-warning">
+            <i class="bi bi-exclamation-circle me-1"></i>현금 경고 ATM
+            <span class="badge bg-warning text-dark ms-2">{{ cash_alerts|length }}건</span>
+        </h6>
+        <a href="{{ url_for('atm.atm_list') }}" class="btn btn-sm btn-outline-secondary">
+            전체 ATM 보기
+        </a>
+    </div>
+    <div class="card-body p-0">
+        {% if cash_alerts %}
+        <div class="table-responsive">
+            <table class="table table-hover table-sm mb-0" id="alert-table">
+                <thead>
+                    <tr>
+                        <th>ATM</th>
+                        <th>지점</th>
+                        <th>은행</th>
+                        <th class="text-end">현금잔량</th>
+                        <th class="text-end">경고임계값</th>
+                        <th>상태</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for a in cash_alerts %}
+                    <tr>
+                        <td class="fw-bold">ATM-{{ a['ATM_id'] }}</td>
+                        <td>{{ a['지점명'] }}</td>
+                        <td>
+                            <span class="badge bg-secondary">{{ a['은행명'] }}</span>
+                        </td>
+                        <td class="text-end text-danger fw-bold">
+                            {{ "{:,}".format(a['현금잔량']) }}원
+                        </td>
+                        <td class="text-end text-muted">
+                            {{ "{:,}".format(a['경고임계값']) }}원
+                        </td>
+                        <td>
+                            {# 상태별 배지 색상 #}
+                            <span class="badge
+                                {% if a['상태'] == '정상' %}bg-success
+                                {% elif a['상태'] == '점검중' %}bg-warning text-dark
+                                {% else %}bg-danger{% endif %}">
+                                {{ a['상태'] }}
+                            </span>
+                        </td>
+                        <td>
+                            <a href="{{ url_for('atm.atm_detail', atm_id=a['ATM_id']) }}"
+                               class="btn btn-sm btn-outline-primary py-0">
+                                상세
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center text-muted py-4">
+            <i class="bi bi-check2-circle fs-3"></i>
+            <p class="mt-2 mb-0">현금 경고 ATM 없음</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{% endblock %}
