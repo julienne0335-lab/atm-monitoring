@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% block title %}거래 통계 - ATM 모니터링{% endblock %}
+
+{% block content %}
+
+<h4 class="fw-bold mb-4">
+    <i class="bi bi-bar-chart-line me-2 text-warning"></i>거래 통계
+    <small class="text-muted fs-6 ms-2">
+        {{ '전체' if is_super else '담당 지점' }}
+    </small>
+</h4>
+
+<div class="row g-3">
+
+    <!-- 거래유형별 분포 -->
+    <div class="col-md-5">
+        <div class="card border-secondary h-100">
+            <div class="card-header small text-muted">거래유형별 분포</div>
+            <div class="card-body">
+                {# 전체 건수 합산 (비율 계산용) #}
+                {% set total_count = namespace(v=0) %}
+                {% for row in type_stats %}
+                    {% set total_count.v = total_count.v + row['건수'] %}
+                {% endfor %}
+
+                {% for row in type_stats %}
+                {% set ratio = (row['건수'] / total_count.v * 100) if total_count.v > 0 else 0 %}
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between small mb-1">
+                        <span>{{ row['거래유형'] }}</span>
+                        <span class="text-muted">
+                            {{ row['건수'] }}건 ({{ "%.1f"|format(ratio) }}%)
+                        </span>
+                    </div>
+                    <div class="progress" style="height: 6px;">
+                        <div class="progress-bar bg-warning"
+                             style="width: {{ ratio|round }}%">
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- 거래량 TOP 5 ATM -->
+    <div class="col-md-7">
+        <div class="card border-secondary h-100">
+            <div class="card-header small text-muted">거래량 TOP 5 ATM</div>
+            <div class="card-body p-0">
+                <table class="table table-sm table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>순위</th>
+                            <th>ATM</th>
+                            <th>지점</th>
+                            <th class="text-end">거래건수</th>
+                            <th class="text-end">수수료합계</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in top_atms %}
+                        <tr>
+                            <td>
+                                {# 상위 3개만 이모지 순위 #}
+                                {% if loop.index == 1 %}🥇
+                                {% elif loop.index == 2 %}🥈
+                                {% elif loop.index == 3 %}🥉
+                                {% else %}{{ loop.index }}
+                                {% endif %}
+                            </td>
+                            <td>ATM-{{ row['ATM_id'] }}</td>
+                            <td class="text-muted">{{ row['지점명'] }}</td>
+                            <td class="text-end">{{ row['거래건수'] }}건</td>
+                            <td class="text-end text-warning">
+                                {{ "{:,}".format(row['수수료합계']) }}원
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- 지점별 자행/타행 비율 -->
+    <div class="col-12">
+        <div class="card border-secondary">
+            <div class="card-header small text-muted">
+                지점별 거래 집계 (자행/타행 비율)
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>은행</th>
+                                <th>지점</th>
+                                <th class="text-end">총 거래</th>
+                                <th class="text-end">자행</th>
+                                <th class="text-end">타행</th>
+                                <th style="min-width:140px;">자행 비율</th>
+                                <th class="text-end">수수료합계</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in branch_stats %}
+                            {% set ratio = (row['자행건수'] / row['거래건수'] * 100) if row['거래건수'] > 0 else 0 %}
+                            <tr>
+                                <td>
+                                    <span class="badge bg-secondary">{{ row['은행명'] }}</span>
+                                </td>
+                                <td>{{ row['지점명'] }}</td>
+                                <td class="text-end">{{ row['거래건수'] }}건</td>
+                                <td class="text-end text-info">{{ row['자행건수'] }}건</td>
+                                <td class="text-end text-muted">{{ row['타행건수'] }}건</td>
+                                <td>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <div class="progress flex-grow-1" style="height: 5px;">
+                                            <div class="progress-bar bg-info"
+                                                 style="width: {{ ratio|round }}%">
+                                            </div>
+                                        </div>
+                                        <small class="text-muted">{{ "%.0f"|format(ratio) }}%</small>
+                                    </div>
+                                </td>
+                                <td class="text-end text-warning">
+                                    {{ "{:,}".format(row['수수료합계']) }}원
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

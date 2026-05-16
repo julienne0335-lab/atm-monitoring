@@ -1,0 +1,108 @@
+/*
+  style.css ─ 다크 테마 커스터마이징
+  Bootstrap 5 로드 후 이 파일이 적용됨
+*/
+
+/* 전체 배경·기본 색상 */
+body {
+    background-color: #0d1117;
+    color: #c9d1d9;
+    font-size: 0.9rem;
+}
+
+/* 네비게이션 바 */
+#main-nav {
+    background-color: #161b22 !important;
+}
+
+/* 카드 */
+.card {
+    background-color: #161b22;
+    border-color: #30363d !important;
+}
+.card-header {
+    background-color: #1c2128;
+    border-color: #30363d;
+}
+
+/* 로그인 카드 */
+#login-card {
+    background-color: #161b22;
+}
+
+/* 테이블 */
+.table {
+    --bs-table-bg: #161b22;
+    --bs-table-hover-bg: #1c2128;
+    --bs-table-border-color: #30363d;
+    --bs-table-color: #c9d1d9;
+    --bs-table-striped-bg: #1c2128;
+}
+thead th {
+    background-color: #1c2128;
+    color: #8b949e;
+    font-weight: 500;
+    border-color: #30363d;
+}
+
+/* 현금경고 테이블 헤더 */
+#alert-table thead th {
+    background-color: #1c2128;
+}
+
+/* 폼 컨트롤 */
+.form-control,
+.form-select {
+    background-color: #0d1117;
+    color: #c9d1d9;
+    border-color: #30363d;
+}
+.form-control:focus,
+.form-select:focus {
+    background-color: #0d1117;
+    color: #c9d1d9;
+    border-color: #f0b429;
+    box-shadow: 0 0 0 0.2rem rgba(240, 180, 41, 0.15);
+}
+/* placeholder 색 */
+.form-control::placeholder {
+    color: #484f58;
+}
+
+/* 드롭다운 */
+.dropdown-menu-dark {
+    background-color: #161b22;
+    border-color: #30363d;
+}
+
+/* 프로그레스 바 */
+.progress {
+    background-color: #30363d;
+}
+
+/* 페이지네이션 */
+.page-link {
+    background-color: #161b22;
+    border-color: #30363d;
+    color: #c9d1d9;
+}
+.page-link:hover {
+    background-color: #1c2128;
+    color: #f0b429;
+}
+.page-item.active .page-link {
+    background-color: #f0b429;
+    border-color: #f0b429;
+    color: #0d1117;
+}
+
+/* 알림(alert) */
+.alert {
+    font-size: 0.875rem;
+}
+
+/* 배지 */
+.badge {
+    font-weight: 500;
+    font-size: 0.75rem;
+}
