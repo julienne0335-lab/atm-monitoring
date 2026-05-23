@@ -1,7 +1,7 @@
 -- ============================================
--- ATM 관리 시스템 DDL (수정본)
+-- ATM 관리 시스템 DDL (최종본)
 -- DBMS: MariaDB
--- 명명규칙: PK/FK 모두 테이블명_ID 또는 테이블명ID 형식 통일
+-- 명명규칙: PK/FK 모두 테이블명ID 형식 통일
 -- ============================================
 
 DROP DATABASE IF EXISTS atm_system;
@@ -53,7 +53,7 @@ CREATE TABLE ATM (
     현금잔량     DECIMAL(15,0) NOT NULL DEFAULT 0 CHECK (현금잔량 >= 0),
     경고임계값   DECIMAL(15,0) NOT NULL DEFAULT 1000000,
     ATM현금상태  VARCHAR(20)   NOT NULL DEFAULT '정상'
-             CHECK (ATM현금상태 IN ('정상', '현금부족경고')),
+                 CHECK (ATM현금상태 IN ('정상', '현금부족경고')),
     최종갱신일시 DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (지점ID) REFERENCES 지점(지점ID)
 );
@@ -72,6 +72,7 @@ CREATE TABLE 관리자 (
 );
 
 -- 7. 거래내역
+-- 처리상태: 성공/실패만 (지점장애/은행장애는 ATM장애로그.장애유형으로 관리)
 CREATE TABLE 거래내역 (
     거래ID      INT           AUTO_INCREMENT PRIMARY KEY,
     ATM_ID      INT           NOT NULL,
@@ -82,7 +83,7 @@ CREATE TABLE 거래내역 (
     거래금액    DECIMAL(15,0) NOT NULL,
     수수료      DECIMAL(10,0) NOT NULL DEFAULT 0,
     처리상태    VARCHAR(20)   NOT NULL DEFAULT '성공'
-            CHECK (처리상태 IN ('성공', '실패', '지점장애', '은행장애')),
+                CHECK (처리상태 IN ('성공', '실패')),
     거래일시    DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (ATM_ID)     REFERENCES ATM(ATM_ID),
     FOREIGN KEY (계좌ID)     REFERENCES 계좌(계좌ID),
@@ -90,12 +91,13 @@ CREATE TABLE 거래내역 (
 );
 
 -- 8. ATM장애로그
+-- 장애유형: 기존 5종 + 지점장애/은행장애 추가 (BR-11, BR-12)
 CREATE TABLE ATM장애로그 (
     장애ID       INT         AUTO_INCREMENT PRIMARY KEY,
     ATM_ID       INT         NOT NULL,
     관리자ID     INT,
     장애유형     VARCHAR(50) NOT NULL
-                 CHECK (장애유형 IN ('현금부족', '기계오류', '네트워크', '전산오류', '카드리더오류')),
+                 CHECK (장애유형 IN ('현금부족', '기계오류', '네트워크', '전산오류', '카드리더오류', '지점장애', '은행장애')),
     상세내용     TEXT,
     처리상태     VARCHAR(20) NOT NULL DEFAULT '미처리'
                  CHECK (처리상태 IN ('미처리', '처리완료')),
@@ -135,7 +137,7 @@ CREATE TABLE 지점장애로그 (
     지점ID       INT         NOT NULL,
     관리자ID     INT,
     장애유형     VARCHAR(50) NOT NULL
-             CHECK (장애유형 IN ('네트워크', '전산오류', '전력이상', '서버오류')),
+                 CHECK (장애유형 IN ('네트워크', '전산오류', '전력이상', '서버오류')),
     상세내용     TEXT,
     처리상태     VARCHAR(20) NOT NULL DEFAULT '미처리'
                  CHECK (처리상태 IN ('미처리', '처리완료')),
@@ -151,7 +153,7 @@ CREATE TABLE 은행장애로그 (
     은행ID       INT         NOT NULL,
     관리자ID     INT,
     장애유형     VARCHAR(50) NOT NULL
-             CHECK (장애유형 IN ('데이터베이스오류', '네트워크', '전산망장애', '보안시스템오류')),
+                 CHECK (장애유형 IN ('데이터베이스오류', '네트워크', '전산망장애', '보안시스템오류')),
     상세내용     TEXT,
     처리상태     VARCHAR(20) NOT NULL DEFAULT '미처리'
                  CHECK (처리상태 IN ('미처리', '처리완료')),
@@ -166,9 +168,89 @@ CREATE TABLE 은행장애로그 (
 -- 인덱스
 -- ============================================
 
-CREATE INDEX idx_거래내역_거래일시 ON 거래내역(거래일시);
-CREATE INDEX idx_거래내역_ATM_일시 ON 거래내역(ATM_ID, 거래일시);
+CREATE INDEX idx_거래내역_거래일시   ON 거래내역(거래일시);
+CREATE INDEX idx_거래내역_ATM_일시   ON 거래내역(ATM_ID, 거래일시);
 CREATE INDEX idx_ATM장애로그_처리상태 ON ATM장애로그(ATM_ID, 처리상태);
-CREATE INDEX idx_유지보수_ATM_일시 ON 유지보수이력(ATM_ID, 점검일시);
-CREATE INDEX idx_지점장애_처리상태 ON 지점장애로그(지점ID, 처리상태);
-CREATE INDEX idx_은행장애_처리상태 ON 은행장애로그(은행ID, 처리상태);
+CREATE INDEX idx_유지보수_ATM_일시   ON 유지보수이력(ATM_ID, 점검일시);
+CREATE INDEX idx_지점장애_처리상태   ON 지점장애로그(지점ID, 처리상태);
+CREATE INDEX idx_은행장애_처리상태   ON 은행장애로그(은행ID, 처리상태);
+
+
+-- ============================================
+-- 프로시저
+-- ============================================
+
+DELIMITER //
+
+-- proc_지점장애_생성
+-- 지점장애로그 INSERT 시 해당 지점 소속 ATM 전체에 ATM장애로그 일괄 생성 (BR-11)
+-- 트랜잭션 내 일부 실패 시 전체 롤백
+CREATE PROCEDURE proc_지점장애_생성(
+    IN p_지점ID    INT,
+    IN p_장애유형  VARCHAR(50),
+    IN p_상세내용  TEXT
+)
+BEGIN
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        RESIGNAL;
+    END;
+
+    START TRANSACTION;
+
+    -- 지점장애로그 INSERT
+    INSERT INTO 지점장애로그 (지점ID, 관리자ID, 장애유형, 상세내용, 처리상태, 발생일시)
+    VALUES (p_지점ID, NULL, p_장애유형, p_상세내용, '미처리', NOW());
+
+    -- 해당 지점 ATM 상태 전환
+    UPDATE ATM
+    SET 상태 = '장애', 최종갱신일시 = NOW()
+    WHERE 지점ID = p_지점ID;
+
+    -- 해당 지점 소속 ATM 전체에 ATM장애로그 일괄 생성
+    INSERT INTO ATM장애로그 (ATM_ID, 관리자ID, 장애유형, 상세내용, 처리상태, 발생일시)
+    SELECT ATM_ID, NULL, '지점장애', p_상세내용, '미처리', NOW()
+    FROM ATM
+    WHERE 지점ID = p_지점ID;
+
+    COMMIT;
+END //
+
+
+-- proc_은행장애_생성
+-- 은행장애로그 INSERT 시 해당 은행 소속 전 지점 ATM 전체에 ATM장애로그 일괄 생성 (BR-12)
+-- 트랜잭션 내 일부 실패 시 전체 롤백
+CREATE PROCEDURE proc_은행장애_생성(
+    IN p_은행ID    INT,
+    IN p_장애유형  VARCHAR(50),
+    IN p_상세내용  TEXT
+)
+BEGIN
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        RESIGNAL;
+    END;
+
+    START TRANSACTION;
+
+    -- 은행장애로그 INSERT
+    INSERT INTO 은행장애로그 (은행ID, 관리자ID, 장애유형, 상세내용, 처리상태, 발생일시)
+    VALUES (p_은행ID, NULL, p_장애유형, p_상세내용, '미처리', NOW());
+
+    -- 해당 은행 전체 ATM 상태 전환
+    UPDATE ATM
+    SET 상태 = '장애', 최종갱신일시 = NOW()
+    WHERE 지점ID IN (SELECT 지점ID FROM 지점 WHERE 은행ID = p_은행ID);
+
+    -- 해당 은행 소속 전 ATM에 ATM장애로그 일괄 생성
+    INSERT INTO ATM장애로그 (ATM_ID, 관리자ID, 장애유형, 상세내용, 처리상태, 발생일시)
+    SELECT ATM_ID, NULL, '은행장애', p_상세내용, '미처리', NOW()
+    FROM ATM
+    WHERE 지점ID IN (SELECT 지점ID FROM 지점 WHERE 은행ID = p_은행ID);
+
+    COMMIT;
+END //
+
+DELIMITER ;
