@@ -216,3 +216,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# DB 접속 설정 (비밀번호 보안)
+db.py
