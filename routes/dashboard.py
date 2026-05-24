@@ -54,6 +54,11 @@ def index():
             # 현금잔량 <= 경고임계값인 ATM 목록 (경고 섹션)
             cash_alerts = atm_service.get_cash_alerts(is_super, branch_id),
 
+            # 장애 ATM 목록 (대시보드 장애 섹션)
+            faulty_atms  = atm_service.get_atm_list(is_super, branch_id, status="장애"),
+            # 점검중 ATM 목록 (대시보드 점검중 섹션)
+            pending_atms = atm_service.get_atm_list(is_super, branch_id, status="점검중"),
+
             # 오늘 날짜 기준 거래 통계 (오늘 현황 카드)
             today_stats = transaction_service.get_today_stats(is_super, branch_id),
 
@@ -65,10 +70,12 @@ def index():
     except Exception as e:
         # DB 오류 등 발생 시 빈 값으로 폼백 (대시보드 페이지는 항상 보여야 함)
         return render_template("dashboard.html",
-            atm_status  = {"정상": 0, "점검중": 0, "장애": 0},
-            cash_alerts = [],
-            today_stats = {},
-            error_count = 0,
-            is_super    = False,
-            db_error    = str(e),  # 템플릿에서 오류 메시지 표시에 사용
+            atm_status   = {"정상": 0, "점검중": 0, "장애": 0},
+            cash_alerts  = [],
+            faulty_atms  = [],
+            pending_atms = [],
+            today_stats  = {},
+            error_count  = 0,
+            is_super     = False,
+            db_error     = str(e),
         )

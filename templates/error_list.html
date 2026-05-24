@@ -1,0 +1,250 @@
+{% extends "base.html" %}
+
+{% block title %}
+  {% if error_type == "branch" %}지점장애 관리{% else %}은행장애 관리{% endif %} - ATM 운영 모니터링
+{% endblock %}
+
+{% block content %}
+
+{# ── 페이지 헤더 ── #}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="fw-bold mb-0">
+        {% if error_type == "branch" %}
+            <i class="bi bi-building-exclamation text-warning me-2"></i>지점장애 관리
+        {% else %}
+            <i class="bi bi-bank text-danger me-2"></i>은행장애 관리
+        {% endif %}
+    </h5>
+
+    {# 지점/은행 탭 전환 (슈퍼관리자만 은행장애 탭 표시) #}
+    <div class="btn-group" role="group">
+        <a href="{{ url_for('error.branch_error_list') }}"
+           class="btn btn-sm {% if error_type == 'branch' %}btn-warning{% else %}btn-outline-secondary{% endif %}">
+            <i class="bi bi-building me-1"></i>지점장애
+        </a>
+        {% if is_super %}
+        <a href="{{ url_for('error.bank_error_list') }}"
+           class="btn btn-sm {% if error_type == 'bank' %}btn-danger{% else %}btn-outline-secondary{% endif %}">
+            <i class="bi bi-bank me-1"></i>은행장애
+        </a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="row g-3">
+
+    {# ── 왼쪽: 장애 등록 폼 ── #}
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="bi bi-plus-circle me-1"></i>
+                    {% if error_type == "branch" %}지점장애 등록{% else %}은행장애 등록{% endif %}
+                </h6>
+            </div>
+            <div class="card-body">
+
+                {% if error_type == "branch" %}
+                <form method="POST" action="{{ url_for('error.report_branch_error') }}">
+                    {# 지점 선택 #}
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">지점</label>
+                        <select class="form-select" name="branch_id" required>
+                            <option value="">-- 지점 선택 --</option>
+                            {% for branch in branches %}
+                                {# 일반관리자는 자기 지점만 선택 가능 #}
+                                {% if is_super or branch['지점ID'] == admin_branch_id %}
+                                <option value="{{ branch['지점ID'] }}"
+                                    {% if not is_super %}selected{% endif %}>
+                                    {{ branch['지점명'] }}
+                                </option>
+                                {% endif %}
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    {# 장애유형 선택 #}
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">장애유형</label>
+                        <select class="form-select" name="error_type" required>
+                            <option value="">-- 유형 선택 --</option>
+                            {% for t in error_types %}
+                            <option value="{{ t }}">{{ t }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    {# 상세내용 #}
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">상세내용</label>
+                        <textarea class="form-control" name="detail" rows="3"
+                                  placeholder="장애 상세 내용을 입력하세요"></textarea>
+                    </div>
+
+                    <button type="submit" class="btn btn-warning w-100">
+                        <i class="bi bi-send me-1"></i>장애 등록
+                    </button>
+                </form>
+
+                {% else %}
+                {# 은행장애 폼 (슈퍼관리자 전용) #}
+                <form method="POST" action="{{ url_for('error.report_bank_error') }}">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">은행</label>
+                        <select class="form-select" name="bank_id" required>
+                            <option value="">-- 은행 선택 --</option>
+                            {% for bank in banks %}
+                            <option value="{{ bank['은행ID'] }}">{{ bank['은행명'] }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">장애유형</label>
+                        <select class="form-select" name="error_type" required>
+                            <option value="">-- 유형 선택 --</option>
+                            {% for t in error_types %}
+                            <option value="{{ t }}">{{ t }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">상세내용</label>
+                        <textarea class="form-control" name="detail" rows="3"
+                                  placeholder="장애 상세 내용을 입력하세요"></textarea>
+                    </div>
+
+                    <button type="submit" class="btn btn-danger w-100">
+                        <i class="bi bi-send me-1"></i>장애 등록
+                    </button>
+                </form>
+                {% endif %}
+
+            </div>
+        </div>
+    </div>
+
+    {# ── 오른쪽: 장애 목록 ── #}
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">
+                    장애 목록
+                    <span class="badge bg-secondary ms-1">{{ errors|length }}건</span>
+                </h6>
+
+                {# 미처리 / 전체 필터 버튼 #}
+                <div class="btn-group btn-group-sm">
+                    {% if error_type == "branch" %}
+                    <a href="{{ url_for('error.branch_error_list') }}"
+                       class="btn {% if status_filter == '' %}btn-secondary{% else %}btn-outline-secondary{% endif %}">
+                        전체
+                    </a>
+                    <a href="{{ url_for('error.branch_error_list', filter='미처리') }}"
+                       class="btn {% if status_filter == '미처리' %}btn-warning{% else %}btn-outline-secondary{% endif %}">
+                        미처리
+                    </a>
+                    {% else %}
+                    <a href="{{ url_for('error.bank_error_list') }}"
+                       class="btn {% if status_filter == '' %}btn-secondary{% else %}btn-outline-secondary{% endif %}">
+                        전체
+                    </a>
+                    <a href="{{ url_for('error.bank_error_list', filter='미처리') }}"
+                       class="btn {% if status_filter == '미처리' %}btn-danger{% else %}btn-outline-secondary{% endif %}">
+                        미처리
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="card-body p-0">
+                {% if errors %}
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                {% if error_type == "branch" %}
+                                <th>지점명</th>
+                                {% else %}
+                                <th>은행명</th>
+                                {% endif %}
+                                <th>장애유형</th>
+                                <th>상세내용</th>
+                                <th>발생일시</th>
+                                <th>처리상태</th>
+                                <th>담당자</th>
+                                <th>처리완료일시</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for e in errors %}
+                            <tr>
+                                {% if error_type == "branch" %}
+                                <td class="fw-semibold">{{ e.get('지점명', '-') }}</td>
+                                {% else %}
+                                <td class="fw-semibold">{{ e.get('은행명', '-') }}</td>
+                                {% endif %}
+
+                                <td>
+                                    <span class="badge bg-secondary">{{ e.get('장애유형', '-') }}</span>
+                                </td>
+
+                                <td class="text-muted small" style="max-width:180px; word-break:break-all;">
+                                    {{ e.get('상세내용', '') or '-' }}
+                                </td>
+
+                                <td class="small text-nowrap">
+                                    {{ e.get('발생일시', '-') }}
+                                </td>
+
+                                <td>
+                                    {% if e.get('처리상태') == '미처리' %}
+                                    <span class="badge bg-danger">미처리</span>
+                                    {% else %}
+                                    <span class="badge bg-success">처리완료</span>
+                                    {% endif %}
+                                </td>
+
+                                <td class="small">{{ e.get('담당자명', '-') or '-' }}</td>
+
+                                <td class="small text-nowrap">
+                                    {{ e.get('처리완료일시', '-') or '-' }}
+                                </td>
+
+                                {# 미처리일 때만 처리완료 버튼 표시 #}
+                                <td>
+                                    {% if e.get('처리상태') == '미처리' %}
+                                        {% if error_type == "branch" %}
+                                        <form method="POST"
+                                              action="{{ url_for('error.resolve_branch_error', branch_error_id=e['지점장애ID']) }}"
+                                              onsubmit="return confirm('처리완료 처리하시겠습니까?')">
+                                            <button class="btn btn-sm btn-outline-success">완료</button>
+                                        </form>
+                                        {% else %}
+                                        <form method="POST"
+                                              action="{{ url_for('error.resolve_bank_error', bank_error_id=e['은행장애ID']) }}"
+                                              onsubmit="return confirm('처리완료 처리하시겠습니까?')">
+                                            <button class="btn btn-sm btn-outline-success">완료</button>
+                                        </form>
+                                        {% endif %}
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center text-muted py-5">
+                    <i class="bi bi-check-circle fs-1 d-block mb-2 text-success"></i>
+                    {% if status_filter == '미처리' %}미처리 장애가 없습니다.{% else %}장애 이력이 없습니다.{% endif %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

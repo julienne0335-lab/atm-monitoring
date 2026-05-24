@@ -7,7 +7,11 @@ dao/auth_dao.py ─ 관리자 인증 관련 SQL 쿼리 모음
                               (그 역할은 services/auth_service.py가 담당)
 
 [참조 테이블]
-  관리자, 지점, 장애로그, ATM
+  관리자, 지점
+
+[장애 건수 집계]
+  미처리 장애 건수 조회는 dao/error_dao.py 로 이동됨.
+  (find_unresolved_atm_error_count)
 """
 
 
@@ -22,43 +26,19 @@ def find_by_login_id(conn, login_id):
         "로그인아이디": "admin01",
         "비밀번호해시": "sha256해시값...",
         "권한등급":   "슈퍼",   -- "슈퍼" 또는 "일반"
-        "지점_id":    None      -- 슈퍼관리자는 지점 없음(NULL)
+        "지점_id":    None     -- 슈퍼관리자는 지점 없음(NULL)
       }
       로그인아이디가 존재하지 않으면 None 반환.
       → service에서 None이면 "아이디 또는 비밀번호 불일치" 에러 발생.
-
-    [SQL 예시]
-      SELECT 관리자ID, 이름, 로그인아이디, 비밀번호해시, 권한등급,
-             지점ID AS 지점_id
-      FROM 관리자
-      WHERE 로그인아이디 = %(login_id)s
     """
-    pass
-
-
-def find_unresolved_error_count(conn, branch_id=None):
-    """
-    미처리 장애 건수를 집계한다. (대시보드 경고 카운터 전용)
-
-    [데이터셋 Issue 2 관련]
-      이 쿼리가 0보다 크면 대시보드에 빨간 경고 배지가 표시됨.
-      슈퍼관리자(branch_id=None)는 전 은행 합산 건수,
-      일반관리자는 자신의 지점 소속 ATM 장애 건수만 조회.
-
-    [파라미터]
-      branch_id : None이면 전체(슈퍼관리자), 값이 있으면 해당 지점만
-
-    [반환값]
-      int  예) 5
-
-    [SQL 예시]
-      SELECT COUNT(*) AS cnt
-      FROM 장애로그 e
-      JOIN ATM a ON e.ATM_ID = a.ATM_ID
-      WHERE e.처리상태 = '미처리'
-        AND (%(branch_id)s IS NULL OR a.지점ID = %(branch_id)s)
-    """
-    pass
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT 관리자ID, 이름, 로그인아이디, 비밀번호해시, 권한등급,
+               지점ID AS 지점_id
+        FROM 관리자
+        WHERE 로그인아이디 = %s
+    """, (login_id,))
+    return cursor.fetchone()
 
 
 def find_bank_id_by_admin(conn, admin_id):
@@ -78,12 +58,14 @@ def find_bank_id_by_admin(conn, admin_id):
 
     [반환값]
       int  예) 1  (A은행=1, B은행=2)
-      소속 지점이 없는 슈퍼관리자이거나 존재하지 않는 관리자이면 None 반환.
-
-    [SQL 예시]
-      SELECT b.은행ID
-      FROM 관리자 ad
-      JOIN 지점 b ON ad.지점ID = b.지점ID
-      WHERE ad.관리자ID = %(admin_id)s
+      소속 지점이 없는 슈퍼관리자이거나 존재하지 않는 관리자이면 None 반환. 
     """
-    pass
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT b.은행ID
+        FROM 관리자 ad
+        JOIN 지점 b ON ad.지점ID = b.지점ID
+        WHERE ad.관리자ID = %s
+    """, (admin_id,))
+    row = cursor.fetchone()
+    return row["은행ID"] if row else None

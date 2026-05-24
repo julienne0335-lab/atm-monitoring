@@ -20,6 +20,7 @@ from routes.dashboard import dashboard_bp
 from routes.atm import atm_bp
 from routes.transaction import transaction_bp
 from routes.auth import auth_bp
+from routes.error import error_bp
 
 # Flask 앱 객체 생성
 app = Flask(__name__)
@@ -35,6 +36,18 @@ app.register_blueprint(auth_bp)                            # /login, /logout
 app.register_blueprint(dashboard_bp, url_prefix="/")       # /dashboard
 app.register_blueprint(atm_bp,       url_prefix="/atm")    # /atm/list, /atm/<id>, ...
 app.register_blueprint(transaction_bp, url_prefix="/transaction")  # /transaction/list, /transaction/stats
+app.register_blueprint(error_bp,       url_prefix="/error")         # /error/branch, /error/bank
+
+
+@app.after_request
+def no_cache_for_authenticated(response):
+    # 로그인 상태 페이지는 브라우저 캐시에 저장하지 않도록 함
+    # 없으면 로그아웃 후 뒤로가기 시 캐시된 페이지가 그대로 표시됨
+    if "admin_id" in session:
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    return response
 
 
 @app.route("/")

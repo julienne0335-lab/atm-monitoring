@@ -91,21 +91,20 @@
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive">
-                    <table class="table table-sm table-hover mb-0">
+                    <table class="table table-hover mb-0">
                         <thead>
                             <tr>
                                 <th>은행</th>
                                 <th>지점</th>
                                 <th class="text-end">총 거래</th>
                                 <th class="text-end">자행</th>
-                                <th class="text-end">타행</th>
-                                <th style="min-width:140px;">자행 비율</th>
+                                <th style="min-width:160px;">타행 비율</th>
                                 <th class="text-end">수수료합계</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for row in branch_stats %}
-                            {% set ratio = (row['자행건수'] / row['거래건수'] * 100) if row['거래건수'] > 0 else 0 %}
+                            {% set ratio = (row['타행건수'] / row['거래건수'] * 100) if row['거래건수'] > 0 else 0 %}
                             <tr>
                                 <td>
                                     <span class="badge bg-secondary">{{ row['은행명'] }}</span>
@@ -113,15 +112,16 @@
                                 <td>{{ row['지점명'] }}</td>
                                 <td class="text-end">{{ row['거래건수'] }}건</td>
                                 <td class="text-end text-info">{{ row['자행건수'] }}건</td>
-                                <td class="text-end text-muted">{{ row['타행건수'] }}건</td>
                                 <td>
                                     <div class="d-flex align-items-center gap-2">
                                         <div class="progress flex-grow-1" style="height: 5px;">
-                                            <div class="progress-bar bg-info"
+                                            <div class="progress-bar bg-warning"
                                                  style="width: {{ ratio|round }}%">
                                             </div>
                                         </div>
-                                        <small class="text-muted">{{ "%.0f"|format(ratio) }}%</small>
+                                        <small class="text-muted text-nowrap">
+                                            {{ "%.0f"|format(ratio) }}% ({{ row['타행건수'] }}건)
+                                        </small>
                                     </div>
                                 </td>
                                 <td class="text-end text-warning">

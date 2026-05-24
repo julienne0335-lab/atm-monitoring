@@ -30,23 +30,26 @@ def find_all(conn, branch_id=None, tx_type=None,
 
     [반환값]
       list of dict  (각 row에 거래ID, ATM_ID, 지점명, 계좌번호, 거래유형, 거래금액, 수수료, 처리상태, 거래일시 포함)
-
-    [SQL 예시]
-      SELECT t.거래ID, t.ATM_ID, b.지점명, ac.계좌번호,
-             t.거래유형, t.거래금액, t.수수료, t.처리상태, t.거래일시
-      FROM 거래내역 t
-      JOIN ATM a   ON t.ATM_ID  = a.ATM_ID
-      JOIN 지점 b  ON a.지점ID   = b.지점ID
-      JOIN 계좌 ac ON t.계좌ID   = ac.계좌ID
-      WHERE (%(branch_id)s IS NULL OR a.지점ID    = %(branch_id)s)
-        AND (%(tx_type)s   IS NULL OR t.거래유형   = %(tx_type)s)
-        AND (%(tx_status)s IS NULL OR t.처리상태   = %(tx_status)s)
-        AND (%(date_from)s IS NULL OR DATE(t.거래일시) >= %(date_from)s)
-        AND (%(date_to)s   IS NULL OR DATE(t.거래일시) <= %(date_to)s)
-      ORDER BY t.거래일시 DESC
-      LIMIT %(limit)s OFFSET %(offset)s
     """
-    pass
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT t.거래ID, t.ATM_ID AS ATM_id, b.지점명, ac.계좌번호,
+               t.거래유형, t.거래금액, t.수수료, t.처리상태, t.거래일시,
+               CASE WHEN ac.은행ID = b.은행ID THEN '자행' ELSE '타행' END AS 자행타행여부
+        FROM 거래내역 t
+        JOIN ATM a   ON t.ATM_ID = a.ATM_ID
+        JOIN 지점 b  ON a.지점ID = b.지점ID
+        JOIN 계좌 ac ON t.계좌ID = ac.계좌ID
+        WHERE (%s IS NULL OR a.지점ID        = %s)
+          AND (%s IS NULL OR t.거래유형       = %s)
+          AND (%s IS NULL OR t.처리상태       = %s)
+          AND (%s IS NULL OR DATE(t.거래일시) >= %s)
+          AND (%s IS NULL OR DATE(t.거래일시) <= %s)
+        ORDER BY t.거래일시 DESC
+        LIMIT %s OFFSET %s
+    """, (branch_id, branch_id, tx_type, tx_type, tx_status, tx_status,
+          date_from, date_from, date_to, date_to, limit, offset))
+    return cursor.fetchall()
 
 
 def count_all(conn, branch_id=None, tx_type=None,
@@ -60,18 +63,21 @@ def count_all(conn, branch_id=None, tx_type=None,
 
     [반환값]
       int  예) 500
-
-    [SQL 예시]
-      SELECT COUNT(*) AS cnt
-      FROM 거래내역 t
-      JOIN ATM a ON t.ATM_ID = a.ATM_ID
-      WHERE (%(branch_id)s IS NULL OR a.지점ID  = %(branch_id)s)
-        AND (%(tx_type)s   IS NULL OR t.거래유형 = %(tx_type)s)
-        AND (%(tx_status)s IS NULL OR t.처리상태 = %(tx_status)s)
-        AND (%(date_from)s IS NULL OR DATE(t.거래일시) >= %(date_from)s)
-        AND (%(date_to)s   IS NULL OR DATE(t.거래일시) <= %(date_to)s)
     """
-    pass
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT COUNT(*) AS cnt
+        FROM 거래내역 t
+        JOIN ATM a ON t.ATM_ID = a.ATM_ID
+        WHERE (%s IS NULL OR a.지점ID        = %s)
+          AND (%s IS NULL OR t.거래유형       = %s)
+          AND (%s IS NULL OR t.처리상태       = %s)
+          AND (%s IS NULL OR DATE(t.거래일시) >= %s)
+          AND (%s IS NULL OR DATE(t.거래일시) <= %s)
+    """, (branch_id, branch_id, tx_type, tx_type, tx_status, tx_status,
+          date_from, date_from, date_to, date_to))
+    row = cursor.fetchone()
+    return row["cnt"]
 
 
 def find_today_stats(conn, branch_id=None):
@@ -85,19 +91,21 @@ def find_today_stats(conn, branch_id=None):
         "실패건수": 3,
         "총거래금액": 85000000
       }
-
-    [SQL 예시]
-      SELECT
-        COUNT(*) AS 총건수,
-        SUM(CASE WHEN 처리상태 = '성공' THEN 1 ELSE 0 END) AS 성공건수,
-        SUM(CASE WHEN 처리상태 = '실패' THEN 1 ELSE 0 END) AS 실패건수,
-        COALESCE(SUM(CASE WHEN 처리상태 = '성공' THEN 거래금액 ELSE 0 END), 0) AS 총거래금액
-      FROM 거래내역 t
-      JOIN ATM a ON t.ATM_ID = a.ATM_ID
-      WHERE DATE(t.거래일시) = CURDATE()
-        AND (%(branch_id)s IS NULL OR a.지점ID = %(branch_id)s)
     """
-    pass
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT
+            COUNT(*) AS 총거래건수,
+            SUM(CASE WHEN t.처리상태 = '성공' THEN 1 ELSE 0 END) AS 성공건수,
+            SUM(CASE WHEN t.처리상태 = '실패' THEN 1 ELSE 0 END) AS 실패건수,
+            COALESCE(SUM(CASE WHEN t.처리상태 = '성공' THEN t.거래금액 ELSE 0 END), 0) AS 총거래금액,
+            COALESCE(SUM(CASE WHEN t.처리상태 = '성공' THEN t.수수료 ELSE 0 END), 0) AS 총수수료
+        FROM 거래내역 t
+        JOIN ATM a ON t.ATM_ID = a.ATM_ID
+        WHERE DATE(t.거래일시) = CURDATE()
+          AND (%s IS NULL OR a.지점ID = %s)
+    """, (branch_id, branch_id))
+    return cursor.fetchone()
 
 
 def find_recent_by_atm(conn, atm_id, limit=10):
@@ -111,17 +119,18 @@ def find_recent_by_atm(conn, atm_id, limit=10):
 
     [반환값]
       list of dict  최근 10건의 거래 목록
-
-    [SQL 예시]
-      SELECT t.거래ID, t.거래유형, t.거래금액, t.수수료, t.처리상태, t.거래일시,
-             ac.계좌번호
-      FROM 거래내역 t
-      JOIN 계좌 ac ON t.계좌ID = ac.계좌ID
-      WHERE t.ATM_ID = %(atm_id)s
-      ORDER BY t.거래일시 DESC
-      LIMIT %(limit)s
     """
-    pass
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT t.거래ID, t.거래유형, t.거래금액, t.수수료, t.처리상태, t.거래일시,
+               ac.계좌번호
+        FROM 거래내역 t
+        JOIN 계좌 ac ON t.계좌ID = ac.계좌ID
+        WHERE t.ATM_ID = %s
+        ORDER BY t.거래일시 DESC
+        LIMIT %s
+    """, (atm_id, limit))
+    return cursor.fetchall()
 
 
 def find_branch_stats(conn, branch_id=None):
@@ -137,20 +146,26 @@ def find_branch_stats(conn, branch_id=None):
     [자행/타행 판별 기준]
       계좌의 은행ID == ATM 소속 지점의 은행ID → 자행
       계좌의 은행ID != ATM 소속 지점의 은행ID → 타행
-
-    [SQL 예시]
-      SELECT b.지점명,
-        SUM(CASE WHEN ac.은행ID = b.은행ID THEN 1 ELSE 0 END) AS 자행건수,
-        SUM(CASE WHEN ac.은행ID != b.은행ID THEN 1 ELSE 0 END) AS 타행건수
-      FROM 거래내역 t
-      JOIN ATM a  ON t.ATM_ID = a.ATM_ID
-      JOIN 지점 b ON a.지점ID = b.지점ID
-      JOIN 계좌 ac ON t.계좌ID = ac.계좌ID
-      WHERE (%(branch_id)s IS NULL OR a.지점ID = %(branch_id)s)
-      GROUP BY b.지점ID, b.지점명
-      ORDER BY b.지점명
     """
-    pass
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT wb.은행명, b.지점명,
+            COUNT(*) AS 거래건수,
+            SUM(CASE WHEN ac.은행ID = b.은행ID THEN 1 ELSE 0 END) AS 자행건수,
+            SUM(CASE WHEN ac.은행ID != b.은행ID THEN 1 ELSE 0 END) AS 타행건수,
+            SUM(CASE WHEN ac.은행ID = b.은행ID THEN t.거래금액 ELSE 0 END) AS 자행금액,
+            SUM(CASE WHEN ac.은행ID != b.은행ID THEN t.거래금액 ELSE 0 END) AS 타행금액,
+            COALESCE(SUM(t.수수료), 0) AS 수수료합계
+        FROM 거래내역 t
+        JOIN ATM a   ON t.ATM_ID = a.ATM_ID
+        JOIN 지점 b  ON a.지점ID = b.지점ID
+        JOIN 은행 wb ON b.은행ID = wb.은행ID
+        JOIN 계좌 ac ON t.계좌ID = ac.계좌ID
+        WHERE (%s IS NULL OR a.지점ID = %s)
+        GROUP BY b.지점ID, b.지점명, wb.은행명
+        ORDER BY b.지점명
+    """, (branch_id, branch_id))
+    return cursor.fetchall()
 
 
 def find_type_stats(conn, branch_id=None):
@@ -168,18 +183,19 @@ def find_type_stats(conn, branch_id=None):
     [데이터셋 이체 쌍(Pair) 참고]
       이체(출금) 건수와 이체(입금) 건수는 항상 동일해야 함.
       이 쿼리 결과에서 두 값이 다르면 데이터 정합성 오류.
-
-    [SQL 예시]
-      SELECT t.거래유형,
-             COUNT(*) AS 건수,
-             COALESCE(SUM(t.거래금액), 0) AS 총금액
-      FROM 거래내역 t
-      JOIN ATM a ON t.ATM_ID = a.ATM_ID
-      WHERE (%(branch_id)s IS NULL OR a.지점ID = %(branch_id)s)
-      GROUP BY t.거래유형
-      ORDER BY 건수 DESC
     """
-    pass
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT t.거래유형,
+               COUNT(*) AS 건수,
+               COALESCE(SUM(t.거래금액), 0) AS 총금액
+        FROM 거래내역 t
+        JOIN ATM a ON t.ATM_ID = a.ATM_ID
+        WHERE (%s IS NULL OR a.지점ID = %s)
+        GROUP BY t.거래유형
+        ORDER BY 건수 DESC
+    """, (branch_id, branch_id))
+    return cursor.fetchall()
 
 
 def find_top_atms(conn, branch_id=None, limit=5):
@@ -191,17 +207,19 @@ def find_top_atms(conn, branch_id=None, limit=5):
         {"ATM_ID": 3, "지점명": "강남", "거래건수": 35, "총거래금액": 88000000},
         ...
       ]
-
-    [SQL 예시]
-      SELECT a.ATM_ID, b.지점명,
-             COUNT(*) AS 거래건수,
-             COALESCE(SUM(t.거래금액), 0) AS 총거래금액
-      FROM 거래내역 t
-      JOIN ATM a  ON t.ATM_ID = a.ATM_ID
-      JOIN 지점 b ON a.지점ID = b.지점ID
-      WHERE (%(branch_id)s IS NULL OR a.지점ID = %(branch_id)s)
-      GROUP BY a.ATM_ID, b.지점명
-      ORDER BY 거래건수 DESC
-      LIMIT %(limit)s
     """
-    pass
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT a.ATM_ID AS ATM_id, b.지점명,
+               COUNT(*) AS 거래건수,
+               COALESCE(SUM(t.거래금액), 0) AS 총거래금액,
+               COALESCE(SUM(t.수수료), 0) AS 수수료합계
+        FROM 거래내역 t
+        JOIN ATM a  ON t.ATM_ID = a.ATM_ID
+        JOIN 지점 b ON a.지점ID = b.지점ID
+        WHERE (%s IS NULL OR a.지점ID = %s)
+        GROUP BY a.ATM_ID, b.지점명
+        ORDER BY 거래건수 DESC
+        LIMIT %s
+    """, (branch_id, branch_id, limit))
+    return cursor.fetchall()

@@ -48,6 +48,14 @@
                         </td>
                     </tr>
                     <tr>
+                        <td class="text-muted ps-3">현금상태</td>
+                        <td>
+                            <span class="badge {% if atm['ATM현금상태'] == '정상' %}bg-success{% else %}bg-warning text-dark{% endif %}">
+                                {{ atm['ATM현금상태'] }}
+                            </span>
+                        </td>
+                    </tr>
+                    <tr>
                         <td class="text-muted ps-3">경고임계값</td>
                         <td>{{ "{:,}".format(atm['경고임계값']) }}원</td>
                     </tr>
@@ -107,7 +115,7 @@
                 <p class="small text-muted mb-2">최근 보충 이력</p>
                 {% for r in refill_logs %}
                 <div class="d-flex justify-content-between small text-muted">
-                    <span>{{ r['관리자명'] }}</span>
+                    <span>{{ r['담당자명'] }}</span>
                     <span>{{ "{:,}".format(r['보충금액']) }}원</span>
                     <span>{{ r['보충일시'].strftime('%m/%d') }}</span>
                 </div>
@@ -149,7 +157,7 @@
                                         {{ log['처리상태'] }}
                                     </span>
                                 </td>
-                                <td class="text-muted small">{{ log['담당관리자'] or '-' }}</td>
+                                <td class="text-muted small">{{ log['담당자명'] or '-' }}</td>
                                 <td class="small text-muted">
                                     {{ log['발생일시'].strftime('%m/%d %H:%M') }}
                                 </td>
@@ -190,7 +198,7 @@
                             {% for t in transactions %}
                             <tr>
                                 <td>{{ t['거래유형'] }}</td>
-                                <td class="text-muted">{{ t['고객명'] }}</td>
+                                <td class="text-muted small">{{ t['계좌번호'] }}</td>
                                 <td class="text-end">
                                     {{ "{:,}".format(t['거래금액']) }}원
                                 </td>
@@ -200,7 +208,7 @@
                                 </td>
                                 <td>
                                     <span class="badge
-                                        {{ 'bg-success' if t['처리상태'] == '완료' else 'bg-danger' }}">
+                                        {{ 'bg-success' if t['처리상태'] == '성공' else 'bg-danger' }}">
                                         {{ t['처리상태'] }}
                                     </span>
                                 </td>
