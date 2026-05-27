@@ -36,11 +36,12 @@ def atm_list():
     """
     is_super      = (session.get("admin_role") == "슈퍼")
     branch_id     = session.get("branch_id")
+    bank_id       = session.get("bank_id")
     status_filter = request.args.get("status", "")  # URL 쿼리파라미터에서 상태 필터 추출
 
     try:
         # 빈 문자열은 None으로 변환하여 service에 전달 (None = 전체 조회)
-        atms = atm_service.get_atm_list(is_super, branch_id, status=status_filter or None)
+        atms = atm_service.get_atm_list(is_super, branch_id, status=status_filter or None, bank_id=bank_id)
         return render_template("atm_list.html",
             atm_list      = atms,
             status_filter = status_filter,  # 현재 선택된 필터를 템플릿에 전달 (드롭다운 선택 유지)

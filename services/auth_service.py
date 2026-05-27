@@ -66,27 +66,28 @@ def login(login_id, password):
             "admin_id":   admin["관리자ID"],
             "admin_name": admin["이름"],
             "admin_role": admin["권한등급"],   # "슈퍼" or "일반"
-            "branch_id":  admin["지점_id"],    # 슈퍼관리자는 None
+            "branch_id":  admin["지점_id"],    # 슈퍼관리자도 지점_id 보유 (은행ID 조회용)
+            "bank_id":    admin["은행ID"],     # 슈퍼관리자의 소속 은행 필터링에 사용
         }
     finally:
         conn.close()
 
 
-def get_unresolved_error_count(is_super, branch_id):
+def get_unresolved_error_count(is_super, branch_id, bank_id=None):
     """
     미처리 장애 건수를 반환한다. (대시보드 경고 배지 숫자)
 
     [데이터셋 Issue 2 관련]
       이 값이 0보다 크면 대시보드에 빨간 경고 배지 표시.
-      슈퍼관리자는 전 은행 합산 건수, 일반관리자는 자기 지점 ATM 건수만.
+      슈퍼관리자는 자기 은행 ATM 건수, 일반관리자는 자기 지점 ATM 건수만.
 
     [반환값]
       int  예) 5
     """
     conn = get_connection()
     try:
-        # 슈퍼관리자는 branch_id=None → 전체 조회
-        bid = None if is_super else branch_id
-        return error_dao.find_unresolved_atm_error_count(conn, branch_id=bid)
+        bid      = None if is_super else branch_id
+        bank_fid = bank_id if is_super else None
+        return error_dao.find_unresolved_atm_error_count(conn, branch_id=bid, bank_id=bank_fid)
     finally:
         conn.close()

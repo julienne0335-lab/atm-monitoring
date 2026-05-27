@@ -3,12 +3,31 @@
 
 {% block content %}
 
-<h4 class="fw-bold mb-4">
-    <i class="bi bi-bar-chart-line me-2 text-warning"></i>거래 통계
-    <small class="text-muted fs-6 ms-2">
-        {{ '전체' if is_super else '담당 지점' }}
-    </small>
-</h4>
+<div class="d-flex align-items-center justify-content-between mb-4 gap-3 flex-wrap">
+    <h4 class="fw-bold mb-0">
+        <i class="bi bi-bar-chart-line me-2 text-warning"></i>거래 통계
+        <small class="text-muted fs-6 ms-2">
+            {{ '전체' if is_super else '담당 지점' }}
+        </small>
+    </h4>
+
+    <!-- 기간 필터 폼 -->
+    <form method="GET" action="{{ url_for('transaction.transaction_stats') }}"
+          class="d-flex align-items-center gap-2 flex-wrap">
+        <input type="date" name="date_from" class="form-control form-control-sm"
+               style="width:150px" value="{{ date_from }}">
+        <span class="text-muted small">~</span>
+        <input type="date" name="date_to" class="form-control form-control-sm"
+               style="width:150px" value="{{ date_to }}">
+        <button type="submit" class="btn btn-sm btn-outline-warning">
+            <i class="bi bi-search me-1"></i>조회
+        </button>
+        {% if date_from or date_to %}
+        <a href="{{ url_for('transaction.transaction_stats') }}"
+           class="btn btn-sm btn-outline-secondary">전체</a>
+        {% endif %}
+    </form>
+</div>
 
 <div class="row g-3">
 

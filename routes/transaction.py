@@ -9,10 +9,6 @@ routes/transaction.py ─ 거래내역 / 거래 통계 요청·응답 처리
 [URL 구조]  (app.py에서 url_prefix="/transaction"으로 등록됨)
   GET /transaction/list    → 거래내역 목록 페이지 (필터 + 페이지네이션)
   GET /transaction/stats   → 거래 통계 페이지 (차트용 집계 데이터)
-
-[데이터셋 Issue 5 참고]
-  실패 거래 6건(거래ID: 108, 166, 339, 416, 439, 456)에 수수료 1,000원 오류 존재.
-  DB 담당자가 직접 수정하거나, 템플릿에서 처리상태='실패'인 행의 수수료를 0으로 표시 권장.
 """
 
 from flask import Blueprint, render_template, request, session, flash
@@ -54,6 +50,7 @@ def transaction_list():
     """
     is_super  = (session.get("admin_role") == "슈퍼")
     branch_id = session.get("branch_id")
+    bank_id   = session.get("bank_id")
 
     # URL 쿼리파라미터에서 필터 값 추출 (없으면 빈 문자열 또는 1)
     tx_type   = request.args.get("tx_type",   "").strip() or None
@@ -72,7 +69,7 @@ def transaction_list():
             is_super, branch_id,
             tx_type=tx_type, tx_status=tx_status,
             date_from=date_from, date_to=date_to,
-            page=page,
+            page=page, bank_id=bank_id,
         )
 
         # 필터 현재 값을 템플릿에 전달하여 폼의 선택 상태 유지
@@ -117,16 +114,24 @@ def transaction_stats():
     """
     is_super  = (session.get("admin_role") == "슈퍼")
     branch_id = session.get("branch_id")
+    bank_id   = session.get("bank_id")
+
+    date_from = request.args.get("date_from", "").strip() or None
+    date_to   = request.args.get("date_to",   "").strip() or None
 
     try:
-        stats = transaction_service.get_stats(is_super, branch_id)
+        stats = transaction_service.get_stats(is_super, branch_id, bank_id=bank_id,
+                                              date_from=date_from, date_to=date_to)
         return render_template("transaction_stats.html",
             **stats,       # branch_stats, type_stats, top_atms 언패킹
             is_super=is_super,
+            date_from=date_from or "",
+            date_to=date_to or "",
         )
     except Exception as e:
         flash(f"통계 조회 실패: {e}", "error")
         return render_template("transaction_stats.html",
             branch_stats=[], type_stats=[], top_atms=[],
             is_super=is_super,
+            date_from="", date_to="",
         )

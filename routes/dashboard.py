@@ -45,25 +45,26 @@ def index():
     """
     is_super  = (session.get("admin_role") == "슈퍼")
     branch_id = session.get("branch_id")
+    bank_id   = session.get("bank_id")
 
     try:
         return render_template("dashboard.html",
             # ATM 상태별 대수 집계 (대시보드 상단 요약 카드)
-            atm_status  = atm_service.get_status_summary(is_super, branch_id),
+            atm_status  = atm_service.get_status_summary(is_super, branch_id, bank_id=bank_id),
 
             # 현금잔량 <= 경고임계값인 ATM 목록 (경고 섹션)
-            cash_alerts = atm_service.get_cash_alerts(is_super, branch_id),
+            cash_alerts = atm_service.get_cash_alerts(is_super, branch_id, bank_id=bank_id),
 
             # 장애 ATM 목록 (대시보드 장애 섹션)
-            faulty_atms  = atm_service.get_atm_list(is_super, branch_id, status="장애"),
+            faulty_atms  = atm_service.get_atm_list(is_super, branch_id, status="장애",   bank_id=bank_id),
             # 점검중 ATM 목록 (대시보드 점검중 섹션)
-            pending_atms = atm_service.get_atm_list(is_super, branch_id, status="점검중"),
+            pending_atms = atm_service.get_atm_list(is_super, branch_id, status="점검중", bank_id=bank_id),
 
             # 오늘 날짜 기준 거래 통계 (오늘 현황 카드)
-            today_stats = transaction_service.get_today_stats(is_super, branch_id),
+            today_stats = transaction_service.get_today_stats(is_super, branch_id, bank_id=bank_id),
 
             # 미처리 장애 건수 (상단 네비게이션 경고 배지)
-            error_count = auth_service.get_unresolved_error_count(is_super, branch_id),
+            error_count = auth_service.get_unresolved_error_count(is_super, branch_id, bank_id=bank_id),
 
             is_super    = is_super,
         )

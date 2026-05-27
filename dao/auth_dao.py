@@ -33,10 +33,11 @@ def find_by_login_id(conn, login_id):
     """
     cursor = conn.cursor()
     cursor.execute("""
-        SELECT 관리자ID, 이름, 로그인아이디, 비밀번호해시, 권한등급,
-               지점ID AS 지점_id
-        FROM 관리자
-        WHERE 로그인아이디 = %s
+        SELECT ad.관리자ID, ad.이름, ad.로그인아이디, ad.비밀번호해시, ad.권한등급,
+               ad.지점ID AS 지점_id, b.은행ID
+        FROM 관리자 ad
+        LEFT JOIN 지점 b ON ad.지점ID = b.지점ID
+        WHERE ad.로그인아이디 = %s
     """, (login_id,))
     return cursor.fetchone()
 

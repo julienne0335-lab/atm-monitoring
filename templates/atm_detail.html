@@ -230,6 +230,55 @@
         </div>
 
     </div>
+
+        <!-- 유지보수이력 -->
+        <div class="card border-secondary mt-3">
+            <div class="card-header small text-muted">
+                유지보수이력 (최근 5건)
+                <span class="badge bg-secondary ms-1">{{ maintenance_logs|length }}</span>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>점검내용</th>
+                                <th>점검유형</th>
+                                <th>담당자</th>
+                                <th>점검일시</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for m in maintenance_logs %}
+                            <tr>
+                                <td>{{ m['점검내용'] or '-' }}</td>
+                                <td>
+                                    {% if m['장애유형'] %}
+                                    <span class="badge bg-warning text-dark">장애후</span>
+                                    <span class="text-muted small ms-1">{{ m['장애유형'] }}</span>
+                                    {% else %}
+                                    <span class="badge bg-info text-dark">정기점검</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-muted small">{{ m['담당자명'] or '-' }}</td>
+                                <td class="small text-muted">
+                                    {{ m['점검일시'].strftime('%Y-%m-%d %H:%M') if m['점검일시'] else '-' }}
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="4" class="text-center text-muted py-3">
+                                    유지보수 이력 없음
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </div>
 </div>
 
 {% endblock %}

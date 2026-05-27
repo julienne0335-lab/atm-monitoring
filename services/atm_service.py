@@ -14,26 +14,27 @@ from db import get_connection
 from dao import atm_dao, auth_dao, error_dao
 
 
-def get_atm_list(is_super, branch_id, status=None):
+def get_atm_list(is_super, branch_id, status=None, bank_id=None):
     """
     ATM 목록을 반환한다.
 
     [파라미터]
-      is_super  : True면 슈퍼관리자 → 전체 지점 조회
+      is_super  : True면 슈퍼관리자 → 소속 은행 전체 조회
                   False면 일반관리자 → branch_id 지점만 조회
       branch_id : 세션에서 가져온 관리자의 소속 지점ID
       status    : URL 쿼리파라미터로 받은 상태 필터 (없으면 None)
+      bank_id   : 슈퍼관리자의 소속 은행ID (일반관리자는 None)
 
     [반환값]
       list of dict (dao.find_all 결과 그대로 전달)
     """
     conn = get_connection()
     try:
-        # 슈퍼관리자는 branch_id 필터 없이 전체 조회
-        bid = None if is_super else branch_id
-        return atm_dao.find_all(conn, branch_id=bid, status=status)
+        bid      = None if is_super else branch_id
+        bank_fid = bank_id if is_super else None
+        return atm_dao.find_all(conn, branch_id=bid, status=status, bank_id=bank_fid)
     finally:
-        conn.close()  # 예외 발생 여부와 상관없이 연결 반드시 종료
+        conn.close()
 
 
 def get_atm_detail(atm_id):
@@ -64,10 +65,11 @@ def get_atm_detail(atm_id):
             return None
 
         return {
-            "atm":          atm,
-            "error_logs":   error_dao.find_atm_error_logs(conn, atm_id),
-            "transactions": transaction_dao.find_recent_by_atm(conn, atm_id),
-            "refill_logs":  atm_dao.find_refill_logs(conn, atm_id),
+            "atm":              atm,
+            "error_logs":       error_dao.find_atm_error_logs(conn, atm_id),
+            "transactions":     transaction_dao.find_recent_by_atm(conn, atm_id),
+            "refill_logs":      atm_dao.find_refill_logs(conn, atm_id),
+            "maintenance_logs": atm_dao.find_maintenance_logs(conn, atm_id),
         }
     finally:
         conn.close()
@@ -163,7 +165,7 @@ def process_refill(atm_id, admin_id, amount, is_super=False):
         conn.close()
 
 
-def get_cash_alerts(is_super, branch_id):
+def get_cash_alerts(is_super, branch_id, bank_id=None):
     """
     현금 경고 ATM 목록을 반환한다. (현금잔량 <= 경고임계값인 ATM)
 
@@ -173,13 +175,14 @@ def get_cash_alerts(is_super, branch_id):
     """
     conn = get_connection()
     try:
-        bid = None if is_super else branch_id
-        return atm_dao.find_cash_alerts(conn, branch_id=bid)
+        bid      = None if is_super else branch_id
+        bank_fid = bank_id if is_super else None
+        return atm_dao.find_cash_alerts(conn, branch_id=bid, bank_id=bank_fid)
     finally:
         conn.close()
 
 
-def get_status_summary(is_super, branch_id):
+def get_status_summary(is_super, branch_id, bank_id=None):
     """
     상태별 ATM 대수 요약을 반환한다. (대시보드 상단 요약 카드)
 
@@ -188,7 +191,8 @@ def get_status_summary(is_super, branch_id):
     """
     conn = get_connection()
     try:
-        bid = None if is_super else branch_id
-        return atm_dao.count_by_status(conn, branch_id=bid)
+        bid      = None if is_super else branch_id
+        bank_fid = bank_id if is_super else None
+        return atm_dao.count_by_status(conn, branch_id=bid, bank_id=bank_fid)
     finally:
         conn.close()

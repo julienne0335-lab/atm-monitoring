@@ -104,14 +104,14 @@ def find_bank_id_by_bank_error(conn, bank_error_id):
     return row["은행ID"] if row else None
 
 
-def find_unresolved_atm_error_count(conn, branch_id=None):
+def find_unresolved_atm_error_count(conn, branch_id=None, bank_id=None):
     """
     미처리 ATM 장애 건수를 집계한다. (대시보드 경고 배지 숫자 전용)
 
     [데이터셋 Issue 2 관련]
       이 값이 0보다 크면 대시보드에 빨간 경고 배지 표시.
-      슈퍼관리자(branch_id=None)는 전 은행 합산 건수,
-      일반관리자는 자신의 지점 소속 ATM 장애 건수만 조회.
+      슈퍼관리자(bank_id 전달)는 자기 은행 ATM 건수,
+      일반관리자(branch_id 전달)는 자신의 지점 소속 ATM 장애 건수만 조회.
 
     [반환값]
       int  예) 5
@@ -121,9 +121,11 @@ def find_unresolved_atm_error_count(conn, branch_id=None):
         SELECT COUNT(*) AS cnt
         FROM ATM장애로그 e
         JOIN ATM a ON e.ATM_ID = a.ATM_ID
+        JOIN 지점 b ON a.지점ID = b.지점ID
         WHERE e.처리상태 = '미처리'
           AND (%s IS NULL OR a.지점ID = %s)
-    """, (branch_id, branch_id))
+          AND (%s IS NULL OR b.은행ID = %s)
+    """, (branch_id, branch_id, bank_id, bank_id))
     row = cursor.fetchone()
     return row["cnt"]
 

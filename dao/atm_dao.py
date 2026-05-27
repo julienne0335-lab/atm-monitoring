@@ -16,14 +16,15 @@ dao/atm_dao.py ─ ATM, 현금보충 테이블 담당 쿼리 모음
 """
 
 
-def find_all(conn, branch_id=None, status=None):
+def find_all(conn, branch_id=None, status=None, bank_id=None):
     """
     ATM 전체 목록을 조회한다.
 
     [파라미터]
       conn      : DB 연결 객체 (pymysql.connect 반환값)
-      branch_id : 일반 관리자용 지점 필터. None이면 전체(슈퍼관리자).
+      branch_id : 일반관리자용 지점 필터. None이면 전체.
       status    : 상태 필터. None이면 전체 / "정상"·"점검중"·"장애" 중 하나.
+      bank_id   : 슈퍼관리자용 은행 필터. None이면 전체.
 
     [반환값]
       list of dict
@@ -41,8 +42,9 @@ def find_all(conn, branch_id=None, status=None):
         JOIN 은행  c ON b.은행ID  = c.은행ID
         WHERE (%s IS NULL OR a.지점ID = %s)
           AND (%s IS NULL OR a.상태   = %s)
+          AND (%s IS NULL OR b.은행ID = %s)
         ORDER BY a.ATM_ID
-    """, (branch_id, branch_id, status, status))
+    """, (branch_id, branch_id, status, status, bank_id, bank_id))
     return cursor.fetchall()
 
 
@@ -73,7 +75,7 @@ def find_by_id(conn, atm_id):
     return cursor.fetchone()
 
 
-def find_cash_alerts(conn, branch_id=None):
+def find_cash_alerts(conn, branch_id=None, bank_id=None):
     """
     현금잔량이 경고임계값 이하인 ATM 목록을 조회한다. (대시보드 경고 카드 전용)
 
@@ -84,7 +86,7 @@ def find_cash_alerts(conn, branch_id=None):
 
     [반환값]
       list of dict
-      예) [{"ATM_ID": 1, "현금잔량": 300000, "경고임계값": 500000, "지점명": "강남"}, ...] 
+      예) [{"ATM_ID": 1, "현금잔량": 300000, "경고임계값": 500000, "지점명": "강남"}, ...]
     """
     cursor = conn.cursor()
     cursor.execute("""
@@ -95,19 +97,20 @@ def find_cash_alerts(conn, branch_id=None):
         JOIN 은행  c ON b.은행ID  = c.은행ID
         WHERE a.현금잔량 <= a.경고임계값
           AND (%s IS NULL OR a.지점ID = %s)
+          AND (%s IS NULL OR b.은행ID = %s)
         ORDER BY (a.현금잔량 / a.경고임계값)
-    """, (branch_id, branch_id))
+    """, (branch_id, branch_id, bank_id, bank_id))
     return cursor.fetchall()
 
 
-def count_by_status(conn, branch_id=None):
+def count_by_status(conn, branch_id=None, bank_id=None):
     """
     상태별 ATM 대수를 집계한다. (대시보드 요약 카드에 사용)
 
     [반환값]
       dict  예) {"정상": 21, "점검중": 6, "장애": 3}
       ※ 조회 결과가 없는 상태는 키가 없을 수 있으므로,
-         service나 template에서 .get("정상", 0) 형태로 접근 권장. 
+         service나 template에서 .get("정상", 0) 형태로 접근 권장.
     """
     cursor = conn.cursor()
     cursor.execute("""
@@ -115,8 +118,9 @@ def count_by_status(conn, branch_id=None):
         FROM ATM a
         JOIN 지점 b ON a.지점ID = b.지점ID
         WHERE (%s IS NULL OR a.지점ID = %s)
+          AND (%s IS NULL OR b.은행ID = %s)
         GROUP BY 상태
-    """, (branch_id, branch_id))
+    """, (branch_id, branch_id, bank_id, bank_id))
     rows = cursor.fetchall()
     return {row["상태"]: row["cnt"] for row in rows}
 
@@ -199,6 +203,31 @@ def find_refill_logs(conn, atm_id, limit=5):
         JOIN 관리자 ad ON r.관리자ID = ad.관리자ID
         WHERE r.ATM_ID = %s
         ORDER BY r.보충일시 DESC
+        LIMIT %s
+    """, (atm_id, limit))
+    return cursor.fetchall()
+
+
+def find_maintenance_logs(conn, atm_id, limit=5):
+    """
+    특정 ATM의 유지보수이력을 최근 N건 조회한다. (ATM 상세 페이지 전용)
+
+    [참조 테이블]
+      유지보수이력, 관리자, ATM장애로그 (LEFT JOIN - 장애 없는 정기점검도 포함)
+
+    [반환값]
+      list of dict  예) [{"이력ID": 1, "점검내용": "정기 점검", "담당자명": "김관리", ...}, ...]
+    """
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT m.이력ID, m.점검내용, m.점검일시,
+               ad.이름 AS 담당자명,
+               e.장애유형
+        FROM 유지보수이력 m
+        JOIN 관리자 ad ON m.관리자ID = ad.관리자ID
+        LEFT JOIN ATM장애로그 e ON m.장애ID = e.장애ID
+        WHERE m.ATM_ID = %s
+        ORDER BY m.점검일시 DESC
         LIMIT %s
     """, (atm_id, limit))
     return cursor.fetchall()
