@@ -9,9 +9,9 @@ app.py ─ Flask 애플리케이션 메인 진입점
   routes/   ─ HTTP 요청·응답 처리 (URL → 함수 연결)
   services/ ─ 업무 규칙 검증, 트랜잭션 처리
   dao/      ─ SQL 쿼리 모음
-  db.py     ─ DB 연결 객체 반환 함수 (db.example.py를 복사해서 만들기)
+  db.py     ─ DB 연결 객체 반환 함수 (db.example.py를 복사해서 만들기) 
 """
-
+import os
 from flask import Flask, redirect, url_for, session
 
 # Blueprint: 기능별로 라우트를 분리하는 Flask 모듈화 도구
@@ -63,6 +63,5 @@ def index():
 
 
 if __name__ == "__main__":
-    # debug=True : 코드 수정 시 자동 재시작, 오류 페이지 상세 표시
-    # ⚠️ 실제 배포(Production) 시에는 반드시 debug=False로 변경할 것
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=False) 
