@@ -1,5 +1,5 @@
 -- ============================================
--- ATM 관리 시스템 DAO 쿼리 (수정본)
+-- ATM 관리 시스템 DAO 쿼리 (최종본)
 -- DBMS: MariaDB
 -- 파라미터: ? 로 표시
 -- ============================================
@@ -10,7 +10,7 @@ USE atm_system;
 -- [atm_dao]
 -- ============================================
 
--- atm_dao.find_all(conn, branch_id=None, status=None)
+-- atm_dao.find_all(conn, branch_id=None, status=None, bank_id=None)
 SELECT a.ATM_ID AS ATM_id, a.상태, a.현금잔량, a.경고임계값,
        a.ATM현금상태, a.최종갱신일시, b.지점명, b.은행ID, c.은행명
 FROM ATM a
@@ -18,6 +18,7 @@ JOIN 지점 b ON a.지점ID = b.지점ID
 JOIN 은행 c ON b.은행ID = c.은행ID
 WHERE (? IS NULL OR a.지점ID = ?)
   AND (? IS NULL OR a.상태   = ?)
+  AND (? IS NULL OR b.은행ID = ?)
 ORDER BY a.ATM_ID;
 
 -- atm_dao.find_by_id(conn, atm_id)
@@ -27,7 +28,7 @@ JOIN 지점 b ON a.지점ID = b.지점ID
 JOIN 은행 c ON b.은행ID = c.은행ID
 WHERE a.ATM_ID = ?;
 
--- atm_dao.find_cash_alerts(conn, branch_id=None)
+-- atm_dao.find_cash_alerts(conn, branch_id=None, bank_id=None)
 SELECT a.ATM_ID AS ATM_id, a.상태, a.현금잔량, a.경고임계값, a.ATM현금상태,
        b.지점명, c.은행명
 FROM ATM a
@@ -35,13 +36,15 @@ JOIN 지점 b ON a.지점ID = b.지점ID
 JOIN 은행 c ON b.은행ID = c.은행ID
 WHERE a.현금잔량 <= a.경고임계값
   AND (? IS NULL OR a.지점ID = ?)
+  AND (? IS NULL OR b.은행ID = ?)
 ORDER BY (a.현금잔량 / a.경고임계값);
 
--- atm_dao.count_by_status(conn, branch_id=None)
+-- atm_dao.count_by_status(conn, branch_id=None, bank_id=None)
 SELECT 상태, COUNT(*) AS cnt
 FROM ATM a
 JOIN 지점 b ON a.지점ID = b.지점ID
 WHERE (? IS NULL OR a.지점ID = ?)
+  AND (? IS NULL OR b.은행ID = ?)
 GROUP BY 상태;
 
 -- atm_dao.update_status(conn, atm_id, new_status)
@@ -72,6 +75,17 @@ WHERE r.ATM_ID = ?
 ORDER BY r.보충일시 DESC
 LIMIT ?;
 
+-- atm_dao.find_maintenance_logs(conn, atm_id, limit=10)
+SELECT m.이력ID, m.점검내용, m.점검일시,
+       ad.이름 AS 담당자명,
+       e.장애유형
+FROM 유지보수이력 m
+JOIN 관리자 ad ON m.관리자ID = ad.관리자ID
+LEFT JOIN ATM장애로그 e ON m.장애ID = e.장애ID
+WHERE m.ATM_ID = ?
+ORDER BY m.점검일시 DESC
+LIMIT ?;
+
 -- atm_dao.find_bank_id_by_atm(conn, atm_id)
 SELECT b.은행ID
 FROM ATM a
@@ -84,10 +98,11 @@ WHERE a.ATM_ID = ?;
 -- ============================================
 
 -- auth_dao.find_by_login_id(conn, login_id)
-SELECT 관리자ID, 이름, 로그인아이디, 비밀번호해시, 권한등급,
-       지점ID AS 지점_id
-FROM 관리자
-WHERE 로그인아이디 = ?;
+SELECT ad.관리자ID, ad.이름, ad.로그인아이디, ad.비밀번호해시, ad.권한등급,
+       ad.지점ID AS 지점_id, b.은행ID
+FROM 관리자 ad
+LEFT JOIN 지점 b ON ad.지점ID = b.지점ID
+WHERE ad.로그인아이디 = ?;
 
 -- auth_dao.find_bank_id_by_admin(conn, admin_id)
 SELECT b.은행ID
@@ -100,7 +115,7 @@ WHERE ad.관리자ID = ?;
 -- [transaction_dao]
 -- ============================================
 
--- transaction_dao.find_all(conn, branch_id=None, tx_type=None, tx_status=None, date_from=None, date_to=None, limit=50, offset=0)
+-- transaction_dao.find_all(conn, branch_id=None, tx_type=None, tx_status=None, date_from=None, date_to=None, bank_id=None, limit=50, offset=0)
 SELECT t.거래ID, t.ATM_ID AS ATM_id, b.지점명, ac.계좌번호,
        t.거래유형, t.거래금액, t.수수료, t.처리상태, t.거래일시,
        CASE WHEN ac.은행ID = b.은행ID THEN '자행' ELSE '타행' END AS 자행타행
@@ -113,20 +128,23 @@ WHERE (? IS NULL OR a.지점ID        = ?)
   AND (? IS NULL OR t.처리상태       = ?)
   AND (? IS NULL OR DATE(t.거래일시) >= ?)
   AND (? IS NULL OR DATE(t.거래일시) <= ?)
+  AND (? IS NULL OR b.은행ID         = ?)
 ORDER BY t.거래일시 DESC
 LIMIT ? OFFSET ?;
 
--- transaction_dao.count_all(conn, branch_id=None, tx_type=None, tx_status=None, date_from=None, date_to=None)
+-- transaction_dao.count_all(conn, branch_id=None, tx_type=None, tx_status=None, date_from=None, date_to=None, bank_id=None)
 SELECT COUNT(*) AS cnt
 FROM 거래내역 t
-JOIN ATM a ON t.ATM_ID = a.ATM_ID
+JOIN ATM a  ON t.ATM_ID = a.ATM_ID
+JOIN 지점 b ON a.지점ID = b.지점ID
 WHERE (? IS NULL OR a.지점ID        = ?)
   AND (? IS NULL OR t.거래유형       = ?)
   AND (? IS NULL OR t.처리상태       = ?)
   AND (? IS NULL OR DATE(t.거래일시) >= ?)
-  AND (? IS NULL OR DATE(t.거래일시) <= ?);
+  AND (? IS NULL OR DATE(t.거래일시) <= ?)
+  AND (? IS NULL OR b.은행ID         = ?);
 
--- transaction_dao.find_today_stats(conn, branch_id=None)
+-- transaction_dao.find_today_stats(conn, branch_id=None, bank_id=None)
 SELECT
     COUNT(*) AS 총건수,
     SUM(CASE WHEN t.처리상태 = '성공' THEN 1 ELSE 0 END) AS 성공건수,
@@ -134,9 +152,11 @@ SELECT
     COALESCE(SUM(CASE WHEN t.처리상태 = '성공' THEN t.거래금액 ELSE 0 END), 0) AS 총거래금액,
     COALESCE(SUM(CASE WHEN t.처리상태 = '성공' THEN t.수수료 ELSE 0 END), 0) AS 총수수료
 FROM 거래내역 t
-JOIN ATM a ON t.ATM_ID = a.ATM_ID
+JOIN ATM a  ON t.ATM_ID = a.ATM_ID
+JOIN 지점 b ON a.지점ID = b.지점ID
 WHERE DATE(t.거래일시) = CURDATE()
-  AND (? IS NULL OR a.지점ID = ?);
+  AND (? IS NULL OR a.지점ID = ?)
+  AND (? IS NULL OR b.은행ID = ?);
 
 -- transaction_dao.find_recent_by_atm(conn, atm_id, limit=10)
 SELECT t.거래ID, t.거래유형, t.거래금액, t.수수료, t.처리상태, t.거래일시,
@@ -147,7 +167,7 @@ WHERE t.ATM_ID = ?
 ORDER BY t.거래일시 DESC
 LIMIT ?;
 
--- transaction_dao.find_branch_stats(conn, branch_id=None)
+-- transaction_dao.find_branch_stats(conn, branch_id=None, bank_id=None, date_from=None, date_to=None)
 SELECT b.지점명,
     SUM(CASE WHEN ac.은행ID = b.은행ID THEN 1 ELSE 0 END) AS 자행건수,
     SUM(CASE WHEN ac.은행ID != b.은행ID THEN 1 ELSE 0 END) AS 타행건수,
@@ -157,35 +177,45 @@ FROM 거래내역 t
 JOIN ATM a   ON t.ATM_ID = a.ATM_ID
 JOIN 지점 b  ON a.지점ID = b.지점ID
 JOIN 계좌 ac ON t.계좌ID = ac.계좌ID
-WHERE (? IS NULL OR a.지점ID = ?)
+WHERE (? IS NULL OR a.지점ID        = ?)
+  AND (? IS NULL OR b.은행ID         = ?)
+  AND (? IS NULL OR DATE(t.거래일시) >= ?)
+  AND (? IS NULL OR DATE(t.거래일시) <= ?)
 GROUP BY b.지점ID, b.지점명
 ORDER BY b.지점명;
 
--- transaction_dao.find_type_stats(conn, branch_id=None)
+-- transaction_dao.find_type_stats(conn, branch_id=None, bank_id=None, date_from=None, date_to=None)
 SELECT t.거래유형,
        COUNT(*) AS 건수,
        COALESCE(SUM(t.거래금액), 0) AS 총금액
 FROM 거래내역 t
-JOIN ATM a ON t.ATM_ID = a.ATM_ID
-WHERE (? IS NULL OR a.지점ID = ?)
+JOIN ATM a  ON t.ATM_ID = a.ATM_ID
+JOIN 지점 b ON a.지점ID = b.지점ID
+WHERE (? IS NULL OR a.지점ID        = ?)
+  AND (? IS NULL OR b.은행ID         = ?)
+  AND (? IS NULL OR DATE(t.거래일시) >= ?)
+  AND (? IS NULL OR DATE(t.거래일시) <= ?)
 GROUP BY t.거래유형
 ORDER BY 건수 DESC;
 
--- transaction_dao.find_top_atms(conn, branch_id=None, limit=5)
+-- transaction_dao.find_top_atms(conn, branch_id=None, bank_id=None, date_from=None, date_to=None, limit=5)
 SELECT a.ATM_ID, b.지점명,
        COUNT(*) AS 거래건수,
        COALESCE(SUM(t.거래금액), 0) AS 총거래금액
 FROM 거래내역 t
 JOIN ATM a  ON t.ATM_ID = a.ATM_ID
 JOIN 지점 b ON a.지점ID = b.지점ID
-WHERE (? IS NULL OR a.지점ID = ?)
+WHERE (? IS NULL OR a.지점ID        = ?)
+  AND (? IS NULL OR b.은행ID         = ?)
+  AND (? IS NULL OR DATE(t.거래일시) >= ?)
+  AND (? IS NULL OR DATE(t.거래일시) <= ?)
 GROUP BY a.ATM_ID, b.지점명
 ORDER BY 거래건수 DESC
 LIMIT ?;
 
 
 -- ============================================
--- [error_dao] — ATM장애로그 관련 (atm_dao에서 분리)
+-- [error_dao] — ATM장애로그 관련
 -- ============================================
 
 -- error_dao.find_atm_error_logs(conn, atm_id, limit=10)
@@ -203,12 +233,14 @@ SET 처리상태 = '처리완료', 처리완료일시 = NOW()
 WHERE ATM_ID = ?
   AND 처리상태 = '미처리';
 
--- error_dao.find_unresolved_atm_error_count(conn, branch_id=None)
+-- error_dao.find_unresolved_atm_error_count(conn, branch_id=None, bank_id=None)
 SELECT COUNT(*) AS cnt
 FROM ATM장애로그 e
 JOIN ATM a ON e.ATM_ID = a.ATM_ID
+JOIN 지점 b ON a.지점ID = b.지점ID
 WHERE e.처리상태 = '미처리'
-  AND (? IS NULL OR a.지점ID = ?);
+  AND (? IS NULL OR a.지점ID = ?)
+  AND (? IS NULL OR b.은행ID = ?);
 
 
 -- ============================================
@@ -293,7 +325,6 @@ JOIN 지점 b ON a.지점ID = b.지점ID
 WHERE b.은행ID = ?;
 
 -- error_dao.bulk_insert_atm_errors(conn, atm_id, error_type, detail)  [BR-11, BR-12]
--- Python에서 ATM 수만큼 반복 실행
 INSERT INTO ATM장애로그 (ATM_ID, 장애유형, 상세내용, 처리상태, 발생일시)
 VALUES (?, ?, ?, '미처리', NOW());
 
