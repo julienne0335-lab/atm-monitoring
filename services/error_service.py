@@ -72,8 +72,9 @@ def report_branch_error(branch_id, error_type, detail, is_super, admin_branch_id
 
     conn = get_connection()
     try:
-        # 지점장애로그 INSERT + 소속 ATM 전체 장애로그 일괄 INSERT (BR-11)
+        # 지점장애로그 INSERT + 소속 ATM 상태 '장애' 전환 + ATM장애로그 일괄 INSERT (BR-11)
         error_dao.insert_branch_error(conn, branch_id, error_type, detail)
+        error_dao.update_atm_status_by_branch(conn, branch_id)
         atm_ids = error_dao.find_atm_ids_by_branch(conn, branch_id)
         if atm_ids:
             atm_type = BRANCH_TO_ATM_TYPE.get(error_type, '전산오류')
@@ -170,8 +171,9 @@ def report_bank_error(bank_id, error_type, detail, is_super, admin_id):
         if admin_bank_id is not None and int(bank_id) != admin_bank_id:
             raise ValueError("자신의 소속 은행 장애만 등록할 수 있습니다.")
 
-        # 은행장애로그 INSERT + 소속 전 ATM 장애로그 일괄 INSERT (BR-12)
+        # 은행장애로그 INSERT + 소속 전 ATM 상태 '장애' 전환 + ATM장애로그 일괄 INSERT (BR-12)
         error_dao.insert_bank_error(conn, bank_id, error_type, detail)
+        error_dao.update_atm_status_by_bank(conn, bank_id)
         atm_ids = error_dao.find_atm_ids_by_bank(conn, bank_id)
         if atm_ids:
             atm_type = BANK_TO_ATM_TYPE.get(error_type, '전산오류')

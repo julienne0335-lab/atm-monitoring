@@ -28,7 +28,7 @@ app = Flask(__name__)
 # 세션(로그인 상태 유지)에 사용하는 암호화 키
 # Flask는 세션 데이터를 이 키로 서명하여 쿠키에 저장함
 # ⚠️ 실제 서비스에서는 코드에 하드코딩하지 말고 환경변수(os.environ)로 관리할 것
-app.secret_key = "atm-system-secret-key-change-this"
+app.secret_key = os.environ.get("SECRET_KEY", "atm-system-secret-key-change-this")
 
 # ── Blueprint 등록 ──────────────────────────────────────────────────
 # url_prefix: 해당 Blueprint의 모든 라우트 앞에 자동으로 붙는 경로

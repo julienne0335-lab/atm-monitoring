@@ -74,6 +74,26 @@ def find_atm_ids_by_bank(conn, bank_id):
     return [row["ATM_ID"] for row in cursor.fetchall()]
 
 
+def update_atm_status_by_branch(conn, branch_id):
+    """지점 소속 ATM 전체 상태를 '장애'로 변경한다. (BR-11용)"""
+    cursor = conn.cursor()
+    cursor.execute("""
+        UPDATE ATM
+        SET 상태 = '장애', 최종갱신일시 = NOW()
+        WHERE 지점ID = %s
+    """, (branch_id,))
+
+
+def update_atm_status_by_bank(conn, bank_id):
+    """은행 소속 전체 ATM 상태를 '장애'로 변경한다. (BR-12용)"""
+    cursor = conn.cursor()
+    cursor.execute("""
+        UPDATE ATM
+        SET 상태 = '장애', 최종갱신일시 = NOW()
+        WHERE 지점ID IN (SELECT 지점ID FROM 지점 WHERE 은행ID = %s)
+    """, (bank_id,))
+
+
 def bulk_insert_atm_errors(conn, atm_ids, error_type, detail):
     """ATM 장애로그 일괄 INSERT (BR-11, BR-12용)"""
     cursor = conn.cursor()
