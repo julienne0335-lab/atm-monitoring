@@ -285,6 +285,10 @@ SELECT 지점ID
 FROM 지점장애로그
 WHERE 지점장애ID = ?;
 
+-- error_dao.update_atm_status_by_branch(conn, branch_id)  [BR-11]
+UPDATE ATM
+SET 상태 = '장애', 최종갱신일시 = NOW()
+WHERE 지점ID = ?;
 
 -- ============================================
 -- [error_dao] — 은행장애로그 관련
@@ -332,3 +336,8 @@ VALUES (?, ?, ?, '미처리', NOW());
 SELECT 은행ID
 FROM 은행장애로그
 WHERE 은행장애ID = ?;
+
+-- error_dao.update_atm_status_by_bank(conn, bank_id)  [BR-12]
+UPDATE ATM
+SET 상태 = '장애', 최종갱신일시 = NOW()
+WHERE 지점ID IN (SELECT 지점ID FROM 지점 WHERE 은행ID = ?);
